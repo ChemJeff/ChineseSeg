@@ -2,6 +2,7 @@
 '''
 pyTorch version implementation of BiLSTM-CRF model
 for sequence tagging tasks
+code for python 3.x and pyTorch == 0.4
 '''
 
 import torch
@@ -311,10 +312,10 @@ if __name__ == "__main__":
             break
 
     # Make sure prepare_sequence from earlier in the LSTM section is loaded
+    iter_cnt = 0
     for epoch in range(
             10):  # again, normally you would NOT do 300 epochs, it is toy data
         stime = time.time()
-        iter_cnt = 0
         lastloss = 0.0
         for packed_sent, packed_tag in dataloader:
             # Step 1. Remember that Pytorch accumulates gradients.
