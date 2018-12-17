@@ -56,7 +56,7 @@ if __name__ == "__main__":
     opt.vocab_tag = 'vocab_tag.pkl'
     opt.embedding_dim = 64
     opt.hidden_dim = 128
-    opt.batch_size = 5
+    opt.batch_size = 1
     opt.vocab_size = len(word_to_ix)
     opt.START_TAG = START_TAG
     opt.STOP_TAG = STOP_TAG
@@ -85,10 +85,10 @@ if __name__ == "__main__":
 
     # Check predictions from pretrained checkpoint
     with torch.no_grad():
-        sample_cnt = 10
+        sample_cnt = 100
         for packed_sent, packed_tag in testdataloader:
             visual(*model(packed_sent), packed_sent)
-            sample_cnt -= 1
+            # sample_cnt -= opt.batch_size
             if sample_cnt == 0:
                 break
 

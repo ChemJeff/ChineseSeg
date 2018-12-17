@@ -56,6 +56,8 @@ class BiLSTM_CRF(nn.Module):
         self.batch_size = self.opt.batch_size
         self.vocab_size = self.opt.vocab_size
         self.tag_to_ix = tag_to_ix
+        self.START_TAG = self.opt.START_TAG
+        self.STOP_TAG = self.opt.STOP_TAG
         self.tagset_size = len(tag_to_ix)
 
         # 字向量从头训练，其中分配一个词向量给[UNK]即未登录字
@@ -74,8 +76,8 @@ class BiLSTM_CRF(nn.Module):
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
-        self.transitions.data[tag_to_ix[START_TAG], :] = -10000
-        self.transitions.data[:, tag_to_ix[STOP_TAG]] = -10000
+        self.transitions.data[tag_to_ix[self.START_TAG], :] = -10000
+        self.transitions.data[:, tag_to_ix[self.STOP_TAG]] = -10000
 
         self.hidden = self.init_hidden()
 
@@ -98,7 +100,7 @@ class BiLSTM_CRF(nn.Module):
             # Do the forward algorithm to compute the partition function
             init_alphas = torch.full((1, self.tagset_size), -10000., device=self.device)
             # START_TAG has all of the score.
-            init_alphas[0][self.tag_to_ix[START_TAG]] = 0.
+            init_alphas[0][self.tag_to_ix[self.START_TAG]] = 0.
 
             # Wrap in a variable so that we will get automatic backprop
             forward_var = init_alphas
@@ -121,7 +123,7 @@ class BiLSTM_CRF(nn.Module):
                     # scores.
                     alphas_t.append(log_sum_exp(next_tag_var).view(1))
                 forward_var = torch.cat(alphas_t).view(1, -1)
-            terminal_var = forward_var + self.transitions[self.tag_to_ix[STOP_TAG]]
+            terminal_var = forward_var + self.transitions[self.tag_to_ix[self.STOP_TAG]]
             alpha = log_sum_exp(terminal_var)
             alphas[idx] = alpha
 
@@ -160,11 +162,11 @@ class BiLSTM_CRF(nn.Module):
 
             score = torch.zeros(1, device=self.device)
             tags = torch.cat(
-                [torch.tensor([self.tag_to_ix[START_TAG]], dtype=torch.long, device=self.device), tags])
+                [torch.tensor([self.tag_to_ix[self.START_TAG]], dtype=torch.long, device=self.device), tags])
             for i, feat in enumerate(feats):
                 score = score + \
                     self.transitions[tags[i + 1], tags[i]] + feat[tags[i + 1]]
-            score = score + self.transitions[self.tag_to_ix[STOP_TAG], tags[-1]]
+            score = score + self.transitions[self.tag_to_ix[self.STOP_TAG], tags[-1]]
             scores[idx] = score
 
         return scores.view(-1)
@@ -182,7 +184,7 @@ class BiLSTM_CRF(nn.Module):
 
             # Initialize the viterbi variables in log space
             init_vvars = torch.full((1, self.tagset_size), -10000., device=self.device)
-            init_vvars[0][self.tag_to_ix[START_TAG]] = 0
+            init_vvars[0][self.tag_to_ix[self.START_TAG]] = 0
 
             # forward_var at step i holds the viterbi variables for step i-1
             forward_var = init_vvars
@@ -206,7 +208,7 @@ class BiLSTM_CRF(nn.Module):
                 backpointers.append(bptrs_t)
 
             # Transition to STOP_TAG
-            terminal_var = forward_var + self.transitions[self.tag_to_ix[STOP_TAG]]
+            terminal_var = forward_var + self.transitions[self.tag_to_ix[self.STOP_TAG]]
             best_tag_id = argmax(terminal_var)
             path_score = terminal_var[0][best_tag_id]
 
@@ -217,7 +219,7 @@ class BiLSTM_CRF(nn.Module):
                 best_path.append(best_tag_id)
             # Pop off the start tag (we dont want to return that to the caller)
             start = best_path.pop()
-            assert start == self.tag_to_ix[START_TAG]  # Sanity check
+            assert start == self.tag_to_ix[self.START_TAG]  # Sanity check
             best_path.reverse()
             path_scores.append(path_score)
             best_paths.append(torch.tensor(best_path))
@@ -259,11 +261,11 @@ if __name__ == "__main__":
             tag_seq = padded_tag_seq[idx][:seq_lengths[idx]]
             for word, tag in list(zip(sent_seq, tag_seq)):
                 if ix_to_tag[tag.item()] in ['S', 'E']:
-                    print(ix_to_word.get(word.item(), '[UNK]'),end=" ")
+                    print(ix_to_word.get(word.item(), '[UNK]'),end="  ")
                 elif ix_to_tag[tag.item()] in ['B', 'M']:
                     print(ix_to_word.get(word.item(), '[UNK]'),end="")
                 else:
-                    print('[UNK_tag]',end=" ")
+                    print('[UNK_tag]',end="  ")
             print()
 
     START_TAG = "<START>"
@@ -285,6 +287,8 @@ if __name__ == "__main__":
     opt.hidden_dim = 128
     opt.batch_size = 5
     opt.vocab_size = len(word_to_ix)
+    opt.START_TAG = START_TAG
+    opt.STOP_TAG = STOP_TAG
     ix_to_tag[4] = START_TAG
     ix_to_tag[5] = STOP_TAG
     tag_to_ix[START_TAG] = 4
