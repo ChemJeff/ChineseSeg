@@ -1,4 +1,4 @@
-#coding = utf-8
+# coding=utf-8
 '''
 pyTorch version implementation of BiLSTM-CRF model
 for sequence tagging tasks

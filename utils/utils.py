@@ -1,4 +1,4 @@
-#coding=utf-8
+# coding=utf-8
 
 '''
 Some simple utility functions used for Chinese word segmentation

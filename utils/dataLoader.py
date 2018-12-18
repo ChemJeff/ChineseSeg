@@ -1,4 +1,4 @@
-#coding = utf-8
+# coding=utf-8
 
 '''
 Load preprocessed data given in .pkl file and convert it

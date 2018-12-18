@@ -1,4 +1,4 @@
-#coding = utf-8
+# coding=utf-8
 
 '''
 Load data given in .txt file , do some preprocessing 
