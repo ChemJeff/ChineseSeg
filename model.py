@@ -11,12 +11,14 @@ import torch.nn as nn
 import torch.optim as optim
 
 import argparse
-import utils
-import pickle
-import dataLoader
-import dataPreprocess
-import time
 import datetime
+import pickle
+import time
+
+from model.model import *
+import utils
+import utils.dataLoader as dataLoader
+import utils.dataPreprocess as dataPreprocess
 
 # torch.manual_seed(1)
 
@@ -270,19 +272,20 @@ if __name__ == "__main__":
 
     START_TAG = "<START>"
     STOP_TAG = "<STOP>"
+    data_path = "./data/"
     ckpt_path = "./base_ckpt/"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # with open('vocab_tag.pkl', 'rb') as f:
-    #     word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = pickle.load(f)
-    word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = dataPreprocess.build_vocab_tag('train.txt')
-    with open('vocab_tag.pkl', 'wb') as f:
-        pickle.dump((word_to_ix, ix_to_word, tag_to_ix, ix_to_tag), file=f)
+    with open(data_path + 'vocab_tag.pkl', 'rb') as f:
+        word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = pickle.load(f)
+    # word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = dataPreprocess.build_vocab_tag('train.txt')
+    # with open('vocab_tag.pkl', 'wb') as f:
+    #     pickle.dump((word_to_ix, ix_to_word, tag_to_ix, ix_to_tag), file=f)
     opt = argparse.Namespace()
     opt.device = device
-    opt.corpus = 'train_corpus.pkl'
-    opt.vocab_tag = 'vocab_tag.pkl'
+    opt.corpus = data_path + 'train_corpus.pkl'
+    opt.vocab_tag = data_path + 'vocab_tag.pkl'
     opt.embedding_dim = 64
     opt.hidden_dim = 128
     opt.batch_size = 5
@@ -293,14 +296,14 @@ if __name__ == "__main__":
     ix_to_tag[5] = STOP_TAG
     tag_to_ix[START_TAG] = 4
     tag_to_ix[STOP_TAG] = 5
-    train_corpus = dataPreprocess.corpus_convert('train.txt', 'train')
-    with open('train_corpus.pkl', 'wb') as f:
-        pickle.dump(train_corpus, file=f)
+    # train_corpus = dataPreprocess.corpus_convert(data_path + 'train.txt', 'train')
+    # with open('train_corpus.pkl', 'wb') as f:
+    #     pickle.dump(train_corpus, file=f)
     dataset = dataLoader.DataSet(opt)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=opt.batch_size, collate_fn=dataLoader.collate, drop_last=True)
 
-    opt.corpus = 'val_corpus.pkl'
+    opt.corpus = data_path + 'val_corpus.pkl'
 
     testdataset = dataLoader.DataSet(opt)
     testdataloader = torch.utils.data.DataLoader(
@@ -345,10 +348,16 @@ if __name__ == "__main__":
                 stime = time.time()
             if iter_cnt % 1000 == 0 :
                 try:
-                    torch.save(model.state_dict(), ckpt_path+"checkpoint_%d_iter.cpkt" % (iter_cnt))
+                    torch.save(model.state_dict(), ckpt_path + "checkpoint_val_%d_iter.cpkt" % (iter_cnt))
                 except Exception as e:
                     print(e)
+                with torch.no_grad():
+                    for packed_sent, packed_tag in testdataloader:
+                        visual(*model(packed_sent), packed_sent)
         print("%s  last %d iters: %d s, loss = %f" % (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S, %Z'), iter_cnt % 100, time.time() - stime, lastloss))
+        with torch.no_grad():
+            for packed_sent, packed_tag in testdataloader:
+                visual(*model(packed_sent), packed_sent)
 
     # Check predictions after training
     with torch.no_grad():
