@@ -11,39 +11,21 @@ import torch.nn as nn
 import torch.optim as optim
 
 import argparse
-import utils
-import pickle
-import dataLoader
-import dataPreprocess
-import model
-import time
 import datetime
+import pickle
+import time
+
+from model.model import *
+from utils.utils import *
+import utils.dataLoader as dataLoader
+import utils.dataPreprocess as dataPreprocess
 
 if __name__ == "__main__":
 
-    def visual(_, packed_tag_seq, packed_sent_seq):
-        padded_tag_seq, seq_lengths = torch.nn.utils.rnn.pad_packed_sequence(
-            packed_tag_seq, batch_first=True, padding_value=0)
-        padded_sent_seq, seq_lengths = torch.nn.utils.rnn.pad_packed_sequence(
-            packed_sent_seq, batch_first=True, padding_value=0)
-        batch_size = len(seq_lengths)
-        for idx in range(batch_size):
-            sent_seq = padded_sent_seq[idx][:seq_lengths[idx]]
-            tag_seq = padded_tag_seq[idx][:seq_lengths[idx]]
-            for word, tag in list(zip(sent_seq, tag_seq)):
-                if ix_to_tag[tag.item()] in ['S', 'E']:
-                    print(ix_to_word.get(word.item(), '[UNK]'),end="  ")
-                elif ix_to_tag[tag.item()] in ['B', 'M']:
-                    print(ix_to_word.get(word.item(), '[UNK]'),end="")
-                else:
-                    print('[UNK_tag]',end="  ")
-            print()
-
-    START_TAG = "<START>"
-    STOP_TAG = "<STOP>"
-    ckpt_path = "./base_ckpt/checkpoint_17000_iter.cpkt"
+    ckpt_path = "./base_ckpt/checkpoint_val_400_iter.cpkt"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     with open('vocab_tag.pkl', 'rb') as f:
         word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = pickle.load(f)
@@ -58,12 +40,7 @@ if __name__ == "__main__":
     opt.hidden_dim = 128
     opt.batch_size = 1
     opt.vocab_size = len(word_to_ix)
-    opt.START_TAG = START_TAG
-    opt.STOP_TAG = STOP_TAG
-    ix_to_tag[4] = START_TAG
-    ix_to_tag[5] = STOP_TAG
-    tag_to_ix[START_TAG] = 4
-    tag_to_ix[STOP_TAG] = 5
+    opt.tagset_size = len(tag_to_ix)
     # train_corpus = dataPreprocess.corpus_convert('train.txt', 'train')
     # with open('train_corpus.pkl', 'wb') as f:
     #     pickle.dump(train_corpus, file=f)
@@ -71,13 +48,37 @@ if __name__ == "__main__":
     # dataloader = torch.utils.data.DataLoader(
     #     dataset, batch_size=opt.batch_size, collate_fn=dataLoader.collate, drop_last=True)
 
-    opt.corpus = 'val_corpus.pkl'
+    opt.corpus = 'test_corpus.pkl'
+
+    class BiLSTM_CRF(nn.Module):
+        '''
+        几个模块的拼接，测试
+        '''
+        def __init__(self, opt):
+            super(BiLSTM_CRF, self).__init__()
+            self.opt = opt
+            self.embeds = WordEmbedding(self.opt)
+            self.opt.tagset_size += 2    # for [START_TAG] and [STOP_TAG]
+            self.bilstm = BiLSTM(self.opt)
+            opt.tagset_size -= 2    # done inside CRF
+            self.CRF = CRF(self.opt)
+
+        def forward(self, packed_sent):
+            packed_embeds = self.embeds(packed_sent)
+            packed_feats = self.bilstm(packed_embeds)
+            score, best_paths = self.CRF.decode(packed_feats)
+            return score, best_paths
+
+        def neg_log_likelihood(self, packed_sent, packed_tags):
+            packed_embeds = self.embeds(packed_sent)
+            packed_feats = self.bilstm(packed_embeds)
+            return self.CRF.neg_log_likelihood(packed_feats, packed_tags)
 
     testdataset = dataLoader.DataSet(opt)
     testdataloader = torch.utils.data.DataLoader(
         testdataset, batch_size=opt.batch_size, collate_fn=dataLoader.collate, drop_last=True)
 
-    model = model.BiLSTM_CRF(opt, tag_to_ix).to(device)
+    model = BiLSTM_CRF(opt).to(device)
     # optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-4)
 
     # load parameters from checkpoint given
@@ -86,9 +87,10 @@ if __name__ == "__main__":
     # Check predictions from pretrained checkpoint
     with torch.no_grad():
         sample_cnt = 100
-        for packed_sent, packed_tag in testdataloader:
-            visual(*model(packed_sent), packed_sent)
-            # sample_cnt -= opt.batch_size
+        for packed_sent, idx_unsort, words in testdataloader:
+            _, packed_tags = model(packed_sent)
+            visualize(packed_sent, packed_tags, ix_to_word, ix_to_tag, idx_unsort, words)
+            sample_cnt -= opt.batch_size
             if sample_cnt == 0:
                 break
 

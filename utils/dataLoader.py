@@ -26,19 +26,20 @@ class DataSet(data.Dataset) :
         with open(self.opt.vocab_tag, 'rb') as f :
             self.word2id, self.id2word, self.tag2id, self.id2tag = \
                 pickle.load(f)
+        print("Vocab from \'%s\' loaded" % (self.opt.vocab_tag))
         self.vocab_size = len(self.id2word)
         print("Vocab size: %d" % (self.vocab_size))
 
     def __getitem__(self, index) :
-        # print("Fetch next sample in dataset...")
         words = self.dataset['words'][index]
         # 未登录字全部转换到[UNK]对应的序号即vocab_size - 1
+        # 为了防止未登录字信息丢失，需要同时返回原始汉字
         wordids = [self.word2id.get(word, self.vocab_size - 1) for word in words]
         if self.split == 'train' :
             tags = self.dataset['tags'][index]
             tagids = [self.tag2id[tag] for tag in tags]
-            return torch.tensor(wordids), torch.tensor(tagids)
-        return torch.tensor(wordids)
+            return (torch.tensor(wordids), torch.tensor(tagids)), words
+        return (torch.tensor(wordids), ), words
 
     def __len__(self) :
         return len(self.dataset['words'])
@@ -70,22 +71,24 @@ def collate(batch_in_list) :
     '''
     collate function to convert raw data fetched from dataset
     to a torch.nn.utils.rnn.PackedSequence for LSTM input
+    considering usage, return a lot of auxiliary info as well
     '''
     batch_size = len(batch_in_list)
+    words = [item[1] for item in batch_in_list]
     for i in range(batch_size) :
-        batch_in_list[i] = [torch.tensor(item, dtype=torch.int64) for item in batch_in_list[i]]
-    # print(batch_in_list)
-    packed, _ = packBatch(batch_in_list)
-    return packed
+        batch_in_list[i] = [torch.tensor(item, dtype=torch.int64) for item in batch_in_list[i][0]]
+    packed, idx_unsort = packBatch(batch_in_list)
+    return packed, idx_unsort, words
 
 if __name__ == "__main__" :
     opt = argparse.Namespace()
-    opt.corpus = 'train_corpus.pkl'
-    opt.vocab_tag = 'vocab_tag.pkl'
+    opt.corpus = './data/test_corpus.pkl'
+    opt.vocab_tag = './data/vocab_tag.pkl'
     dataset = DataSet(opt)
     dataloader = data.DataLoader(dataset, batch_size=2, collate_fn=collate)
     sample = 10
-    for data in dataloader :
+    for word_ids, idx_unsort, words in dataloader:
+    # for (word_ids, tag_ids), idx_unsort, words in dataloader :
         sample -= 1
         print(data, sep='\n')
         if sample < 0 :

@@ -9,7 +9,7 @@ import pickle
 import time
 
 from model.model import *
-import utils
+from utils.utils import *
 import utils.dataLoader as dataLoader
 import utils.dataPreprocess as dataPreprocess
 
@@ -39,20 +39,20 @@ class BiLSTM_CRF(nn.Module):
 
 if __name__ == "__main__":
 
-    def visual(_, packed_tag_seq, packed_sent_seq):
+    def visual(_, packed_tag_seq, packed_sent_seq, idx_unsort, words):
         padded_tag_seq, seq_lengths = torch.nn.utils.rnn.pad_packed_sequence(
             packed_tag_seq, batch_first=True, padding_value=0)
         padded_sent_seq, seq_lengths = torch.nn.utils.rnn.pad_packed_sequence(
             packed_sent_seq, batch_first=True, padding_value=0)
         batch_size = len(seq_lengths)
-        for idx in range(batch_size):
+        for i, idx in enumerate(idx_unsort):
             sent_seq = padded_sent_seq[idx][:seq_lengths[idx]]
             tag_seq = padded_tag_seq[idx][:seq_lengths[idx]]
-            for word, tag in list(zip(sent_seq, tag_seq)):
+            for j, (word, tag) in enumerate(list(zip(sent_seq, tag_seq))):
                 if ix_to_tag[tag.item()] in ['S', 'E']:
-                    print(ix_to_word.get(word.item(), '[UNK]'),end="  ")
+                    print(ix_to_word.get(word.item(), words[i][j]),end="  ")
                 elif ix_to_tag[tag.item()] in ['B', 'M']:
-                    print(ix_to_word.get(word.item(), '[UNK]'),end="")
+                    print(ix_to_word.get(word.item(), words[i][j]),end="")
                 else:
                     print('[UNK_tag]',end="  ")
             print()
@@ -69,16 +69,16 @@ if __name__ == "__main__":
     #     pickle.dump((word_to_ix, ix_to_word, tag_to_ix, ix_to_tag), file=f)
     opt = argparse.Namespace()
     opt.device = device
-    opt.corpus = data_path + 'train_corpus.pkl'
+    opt.corpus = data_path + 'val_corpus.pkl'
     opt.vocab_tag = data_path + 'vocab_tag.pkl'
     opt.embedding_dim = 64
     opt.hidden_dim = 128
     opt.batch_size = 5
     opt.vocab_size = len(word_to_ix)
     opt.tagset_size = len(tag_to_ix)
-    # train_corpus = dataPreprocess.corpus_convert(data_path + 'train.txt', 'train')
-    # with open(data_path + 'train_corpus.pkl', 'wb') as f:
-    #     pickle.dump(train_corpus, file=f)
+    train_corpus = dataPreprocess.corpus_convert(data_path + 'val.txt', 'train')
+    with open(data_path + 'val_corpus.pkl', 'wb') as f:
+        pickle.dump(train_corpus, file=f)
     dataset = dataLoader.DataSet(opt)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=opt.batch_size, collate_fn=dataLoader.collate, drop_last=True)
@@ -94,8 +94,8 @@ if __name__ == "__main__":
 
     # Check predictions before training
     with torch.no_grad():
-        for packed_sent, packed_tag in testdataloader:
-            visual(*model(packed_sent), packed_sent)
+        for (packed_sent, packed_tag), idx_unsort, words in testdataloader:
+            visual(*model(packed_sent), packed_sent, idx_unsort, words)
             break
 
     iter_cnt = 0
@@ -103,7 +103,7 @@ if __name__ == "__main__":
             10):  # again, normally you would NOT do 300 epochs, it is toy data
         stime = time.time()
         lastloss = 0.0
-        for packed_sent, packed_tag in dataloader:
+        for (packed_sent, packed_tag), idx_unsort, words in dataloader:
             model.zero_grad()
 
             loss = model.neg_log_likelihood(packed_sent, packed_tag)
@@ -112,18 +112,20 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             iter_cnt += 1
-            if iter_cnt % 100 == 0 :
+            if iter_cnt % 1 == 0 :
                 print("%s  last 100 iters: %d s, loss = %f" %(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S, %Z'), time.time() - stime, loss.item()))
                 stime = time.time()
-            if iter_cnt % 1000 == 0 :
+            if iter_cnt % 10 == 0 :
                 try:
-                    torch.save(model.state_dict(), ckpt_path + "checkpoint_test_%d_iter.cpkt" % (iter_cnt))
+                    torch.save(model.state_dict(), ckpt_path + "checkpoint_val_%d_iter.cpkt" % (iter_cnt))
                 except Exception as e:
                     print(e)
                 with torch.no_grad():
-                    for packed_sent, packed_tag in testdataloader:
-                        visual(*model(packed_sent), packed_sent)
+                    for (packed_sent, packed_tag), idx_unsort, words in testdataloader:
+                        visual(*model(packed_sent), packed_sent, idx_unsort, words)
+                        break
         print("%s  last %d iters: %d s, loss = %f" % (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S, %Z'), iter_cnt % 100, time.time() - stime, lastloss))
         with torch.no_grad():
-            for packed_sent, packed_tag in testdataloader:
-                visual(*model(packed_sent), packed_sent)
+            for (packed_sent, packed_tag), idx_unsort, words in testdataloader:
+                visual(*model(packed_sent), packed_sent, idx_unsort, words)
+                break

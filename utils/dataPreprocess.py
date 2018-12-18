@@ -106,19 +106,19 @@ def corpus_convert(file_path, split, encoding='utf-8'):
 
 
 if __name__ == "__main__":
-    train_path = 'train.txt'
-    test_path = 'test.txt'
-    word2id, id2word, tag2id, id2tag = bulid_vocab_tag(train_path)
-    with open('vocab_tag.pkl', 'wb') as f:
-        pickle.dump((word2id, id2word, tag2id, id2tag), file=f)
+    # train_path = './data/train.txt'
+    test_path = './data/test.txt'
+    # word2id, id2word, tag2id, id2tag = bulid_vocab_tag(train_path)
+    # with open('vocab_tag.pkl', 'wb') as f:
+    #     pickle.dump((word2id, id2word, tag2id, id2tag), file=f)
     # with open('vocab_tag.pkl', 'rb') as f :
     #     w2i, i2w, t2i, i2t = pickle.load(f)
     #     print(w2i, i2w, t2i, i2t, sep='\n'
-    train_corpus = corpus_convert(train_path, 'train')
+    # train_corpus = corpus_convert(train_path, 'train')
     test_corpus = corpus_convert(test_path, 'test')
-    with open('train_corpus.pkl', 'wb') as f:
-        pickle.dump(train_corpus, file=f)
+    # with open('train_corpus.pkl', 'wb') as f:
+    #     pickle.dump(train_corpus, file=f)
     with open('test_corpus.pkl', 'wb') as f:
         pickle.dump(test_corpus, file=f)
-    print(train_corpus)
+    # print(train_corpus)
     print(test_corpus)
