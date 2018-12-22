@@ -145,7 +145,7 @@ if __name__ == "__main__":
             visualize(packed_sent, packed_tag, ix_to_word, ix_to_tag, idx_unsort, words)
             break
 
-    iter_cnt = opt.iter_cnt if from_ckpt is not True else 0
+    iter_cnt = opt.iter_cnt if from_ckpt is True else 0
     for epoch in range(
             40):  # again, normally you would NOT do 300 epochs, it is toy data
         stime = time.time()
