@@ -8,11 +8,40 @@ import argparse
 import datetime
 import pickle
 import time
+import os
+import sys
 
 from model.model import *
 from utils.utils import *
 import utils.dataLoader as dataLoader
 import utils.dataPreprocess as dataPreprocess
+
+try:
+    import tensorflow as tf
+except ImportError:
+    print("Tensorflow not installed; No tensorboard logging.")
+    tf = None
+
+def add_summary_value(writer, key, value, iteration):
+    if writer is None:
+        return
+    summary = tf.Summary(value=[tf.Summary.Value(tag=key, simple_value=value)])
+    writer.add_summary(summary, iteration)
+
+def get_lr(optimizer):
+    for group in optimizer.param_groups:
+        return group['lr']
+
+class Logger(object):
+    def __init__(self, file_name):
+        self.terminal = sys.stdout
+        self.log = open(file_name, 'a')
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
 
 class BiLSTM_CRF(nn.Module):
     '''
@@ -42,8 +71,20 @@ if __name__ == "__main__":
 
     ckpt_path = "./base_ckpt/"
     data_path = "./data/"
+    log_dir = "./log/"
+
+    time_suffix = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    log_dir = log_dir + "run_%s/" % (time_suffix)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    stime = time.time()
+    sys.stdout = Logger(log_dir + "log")
+    tf_summary_writer = tf and tf.summary.FileWriter(log_dir + "tflog")
+    
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Device: %s" % (device))
 
     word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = dataPreprocess.build_vocab_tag(data_path + 'train.txt')
     with open(data_path + 'vocab_tag.pkl', 'wb') as f:
@@ -59,6 +100,10 @@ if __name__ == "__main__":
     opt.batch_size = 5
     opt.vocab_size = len(word_to_ix)
     opt.tagset_size = len(tag_to_ix)
+
+    opt.lr = 1e-4
+    opt.weight_decay = 1e-4
+    opt.iter_cnt = 695000       # if non-zero, load checkpoint at iter (#iter_cnt)
 
     train_corpus = dataPreprocess.corpus_convert(data_path + 'train.txt', 'train')
     with open(data_path + 'train_corpus.pkl', 'wb') as f:
@@ -77,8 +122,21 @@ if __name__ == "__main__":
     testdataloader = torch.utils.data.DataLoader(
         testdataset, batch_size=opt.batch_size, collate_fn=dataLoader.collate, drop_last=True)
 
+    print("All necessites prepared, time used: %f s\n" % (time.time() - stime))
     model = BiLSTM_CRF(opt).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, weight_decay=1e-4)
+
+    from_ckpt = False
+    try:
+        print("Load checkpoint at %s" %(ckpt_path + "base_e64_h128_iter%d.cpkt" % (opt.iter_cnt)))
+        # load parameters from checkpoint given
+        model.load_state_dict(torch.load(ckpt_path + "base_e64_h128_iter%d.cpkt" % (opt.iter_cnt)))
+        print("Success\n")
+        from_ckpt = True
+    except Exception as e:
+        print("Failed, check the path and permission of the checkpoint")
+        exit(0)
+
+    optimizer = optim.SGD(model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
 
     # Check predictions before training
     with torch.no_grad():
@@ -87,7 +145,7 @@ if __name__ == "__main__":
             visualize(packed_sent, packed_tag, ix_to_word, ix_to_tag, idx_unsort, words)
             break
 
-    iter_cnt = 0
+    iter_cnt = opt.iter_cnt if from_ckpt is not True else 0
     for epoch in range(
             40):  # again, normally you would NOT do 300 epochs, it is toy data
         stime = time.time()
@@ -102,7 +160,11 @@ if __name__ == "__main__":
             optimizer.step()
             iter_cnt += 1
             if iter_cnt % 100 == 0 :
-                print("%s  last 100 iters: %d s, loss = %f" %(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S, %Z'), time.time() - stime, loss.item()))
+                print("%s  last 100 iters: %d s, iter = %d, loss = %f" %(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S, %Z'), time.time() - stime, iter_cnt, loss.item()))
+                sys.stdout.flush()
+                add_summary_value(tf_summary_writer, "train_loss", loss.item(), iter_cnt)
+                add_summary_value(tf_summary_writer, 'learning_rate', get_lr(optimizer), iter_cnt)
+                tf_summary_writer.flush()
                 stime = time.time()
             if iter_cnt % 1000 == 0 :
                 try:

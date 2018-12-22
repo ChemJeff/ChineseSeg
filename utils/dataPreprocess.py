@@ -56,7 +56,7 @@ def build_vocab_tag(file_path, encoding='utf-8'):
     for i in tag2id.items():
         id2tag[i[1]] = i[0]
 
-    print("Build vocab size = %d, including [UNK]" % (len(word2id)))
+    print("Build vocab size = %d, including [UNK]\n" % (len(word2id)))
     return word2id, id2word, tag2id, id2tag
 
 def corpus_convert(file_path, split, encoding='utf-8'):
@@ -100,7 +100,7 @@ def corpus_convert(file_path, split, encoding='utf-8'):
             corpus['len'] += 1
 
     print("Num of sentences: %d" % (corpus['len']))
-    print("Empty lines: %d" % (eline_cnt))
+    print("Empty lines: %d\n" % (eline_cnt))
 
     return corpus
 

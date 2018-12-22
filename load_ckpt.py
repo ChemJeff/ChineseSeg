@@ -22,7 +22,7 @@ import utils.dataPreprocess as dataPreprocess
 
 if __name__ == "__main__":
 
-    ckpt_path = "./base_ckpt/checkpoint_val_400_iter.cpkt"
+    ckpt_path = "./base_ckpt/base_e64_h128_iter150000.cpkt"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device("cpu")
@@ -90,7 +90,7 @@ if __name__ == "__main__":
         for packed_sent, idx_unsort, words in testdataloader:
             _, packed_tags = model(packed_sent)
             visualize(packed_sent, packed_tags, ix_to_word, ix_to_tag, idx_unsort, words)
-            sample_cnt -= opt.batch_size
+            # sample_cnt -= opt.batch_size
             if sample_cnt == 0:
                 break
 

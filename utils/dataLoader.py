@@ -22,13 +22,13 @@ class DataSet(data.Dataset) :
             self.dataset = pickle.load(f)
         print("Dataset from \'%s\' loaded" % (self.opt.corpus))
         self.split = self.dataset['split']
-        print("Dataset split: %s" %(self.split))
+        print("Dataset split: %s\n" %(self.split))
         with open(self.opt.vocab_tag, 'rb') as f :
             self.word2id, self.id2word, self.tag2id, self.id2tag = \
                 pickle.load(f)
         print("Vocab from \'%s\' loaded" % (self.opt.vocab_tag))
         self.vocab_size = len(self.id2word)
-        print("Vocab size: %d" % (self.vocab_size))
+        print("Vocab size: %d\n" % (self.vocab_size))
 
     def __getitem__(self, index) :
         words = self.dataset['words'][index]
