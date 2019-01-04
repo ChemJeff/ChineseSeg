@@ -69,7 +69,7 @@ class BiLSTM_CRF(nn.Module):
 
 if __name__ == "__main__":
 
-    ckpt_path = "./base_ckpt/"
+    ckpt_path = "./checkpoint/"
     data_path = "./data/"
     log_dir = "./log/"
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print("Device: %s" % (device))
+    print("\nDevice: %s" % (device))
 
     word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = dataPreprocess.build_vocab_tag(data_path + 'train.txt')
     with open(data_path + 'vocab_tag.pkl', 'wb') as f:
@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
     opt.lr = 1e-4
     opt.weight_decay = 1e-4
-    opt.iter_cnt = 695000       # if non-zero, load checkpoint at iter (#iter_cnt)
+    opt.iter_cnt = 0       # if non-zero, load checkpoint at iter (#iter_cnt)
 
     train_corpus = dataPreprocess.corpus_convert(data_path + 'train.txt', 'train')
     with open(data_path + 'train_corpus.pkl', 'wb') as f:
