@@ -20,9 +20,9 @@ def visualize(packed_sent_seq, packed_tag_seq, ix_to_word, ix_to_tag, idx_unsort
         tag_seq = padded_tag_seq[idx][:seq_lengths[idx]]
         for j, (word, tag) in enumerate(list(zip(sent_seq, tag_seq))):
             if ix_to_tag[tag.item()] in ['S', 'E'] and j < seq_lengths[idx] - 1:
-                print(ix_to_word.get(word.item(), words[i][j]),end="  ")
+                print(ix_to_word.get(word.item()) if ix_to_word.get(word.item())!="[UNK]" else words[i][j], end="  ")
             elif ix_to_tag[tag.item()] in ['B', 'M'] or j == seq_lengths[idx] - 1:
-                print(ix_to_word.get(word.item(), words[i][j]),end="")
+                print(ix_to_word.get(word.item()) if ix_to_word.get(word.item())!="[UNK]" else words[i][j], end="")
             else:
                 print(words[i][j]+"(\\unk_tag)",end="")
         print()

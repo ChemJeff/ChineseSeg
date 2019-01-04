@@ -86,9 +86,6 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("\nDevice: %s" % (device))
 
-    word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = dataPreprocess.build_vocab_tag(data_path + 'train.txt')
-    with open(data_path + 'vocab_tag.pkl', 'wb') as f:
-        pickle.dump((word_to_ix, ix_to_word, tag_to_ix, ix_to_tag), file=f)
     with open(data_path + 'vocab_tag.pkl', 'rb') as f:
         word_to_ix, ix_to_word, tag_to_ix, ix_to_tag = pickle.load(f)
     opt = argparse.Namespace()
@@ -105,17 +102,10 @@ if __name__ == "__main__":
     opt.weight_decay = 1e-4
     opt.iter_cnt = 0       # if non-zero, load checkpoint at iter (#iter_cnt)
 
-    train_corpus = dataPreprocess.corpus_convert(data_path + 'train.txt', 'train')
-    with open(data_path + 'train_corpus.pkl', 'wb') as f:
-        pickle.dump(train_corpus, file=f)
-
     dataset = dataLoader.DataSet(opt)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=opt.batch_size, collate_fn=dataLoader.collate, drop_last=True, shuffle=True)
 
-    train_corpus = dataPreprocess.corpus_convert(data_path + 'test.txt', 'test')
-    with open(data_path + 'test_corpus.pkl', 'wb') as f:
-        pickle.dump(train_corpus, file=f)
     opt.corpus = data_path + 'test_corpus.pkl'
 
     testdataset = dataLoader.DataSet(opt)
@@ -125,16 +115,15 @@ if __name__ == "__main__":
     print("All necessites prepared, time used: %f s\n" % (time.time() - stime))
     model = BiLSTM_CRF(opt).to(device)
 
-    from_ckpt = False
-    try:
-        print("Load checkpoint at %s" %(ckpt_path + "base_e64_h128_iter%d.cpkt" % (opt.iter_cnt)))
-        # load parameters from checkpoint given
-        model.load_state_dict(torch.load(ckpt_path + "base_e64_h128_iter%d.cpkt" % (opt.iter_cnt)))
-        print("Success\n")
-        from_ckpt = True
-    except Exception as e:
-        print("Failed, check the path and permission of the checkpoint")
-        exit(0)
+    if opt.iter_cnt > 0:
+        try:
+            print("Load checkpoint at %s" %(ckpt_path + "base_e64_h128_iter%d.cpkt" % (opt.iter_cnt)))
+            # load parameters from checkpoint given
+            model.load_state_dict(torch.load(ckpt_path + "base_e64_h128_iter%d.cpkt" % (opt.iter_cnt)))
+            print("Success\n")
+        except Exception as e:
+            print("Failed, check the path and permission of the checkpoint")
+            exit(0)
 
     optimizer = optim.SGD(model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
 
@@ -145,9 +134,9 @@ if __name__ == "__main__":
             visualize(packed_sent, packed_tag, ix_to_word, ix_to_tag, idx_unsort, words)
             break
 
-    iter_cnt = opt.iter_cnt if from_ckpt is True else 0
+    iter_cnt = opt.iter_cnt
     for epoch in range(
-            40):  # again, normally you would NOT do 300 epochs, it is toy data
+            40):  
         stime = time.time()
         lastloss = 0.0
         for (packed_sent, packed_tag), idx_unsort, words in dataloader:
